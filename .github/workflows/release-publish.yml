@@ -76,7 +76,7 @@ jobs:
           shopt -s nullglob
           for chart in $(echo $CHANGED_CHARTS | sed "s/,/ /g" ); do
             echo "Processing $chart"
-            for pkg in .cr-release-packages/$chart*.tgz; do
+            for pkg in .cr-release-packages/${chart}*.tgz; do
               echo "Uploading $pkg"
               if [ -z "${pkg:-}" ]; then
                 break
