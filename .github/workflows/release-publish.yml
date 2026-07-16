@@ -81,6 +81,7 @@ jobs:
         # would be preserved, causing a non-zero exit. Set nullglob to fix this
         run: |
           shopt -s nullglob
+          ls .cr-release-packages/*.tgz
           for pkg in .cr-release-packages/*.tgz; do
             name=$(helm show chart "${pkg}" | yq -r '.name')
             version=$(helm show chart "${pkg}" | yq -r '.version')
