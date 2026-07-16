@@ -5,11 +5,6 @@ on:
     branches:
       - main
 
-# Two quick merges/pushes to main can cause a chart publish race condition
-concurrency:
-  group: chart-release
-  cancel-in-progress: false
-
 permissions: read-all
 
 jobs:
@@ -51,7 +46,7 @@ jobs:
         uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # v1.7.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-          CR_KEY: test@example.com
+          CR_KEY: helm-charts+no-reply@cloudnative-pg.io
           CR_KEYRING: /tmp/keyring.gpg
           CR_PASSPHRASE_FILE: /tmp/passphrase-file.txt
           CR_SIGN: true
@@ -81,29 +76,14 @@ jobs:
         # would be preserved, causing a non-zero exit. Set nullglob to fix this
         run: |
           shopt -s nullglob
-          ls .cr-release-packages/*.tgz
           for pkg in .cr-release-packages/*.tgz; do
-            name=$(helm show chart "${pkg}" | yq -r '.name')
-            version=$(helm show chart "${pkg}" | yq -r '.version')
-            repo="${GITHUB_REPOSITORY}/${name}"
-
-            # cr packages any chart with files changed since the last tag, not
-            # just ones whose version was bumped, and CR_SKIP_EXISTING only gates
-            # the GitHub release. Skip versions already in GHCR, otherwise an
-            # unrelated edit republishes a chart under an unchanged tag with a
-            # new digest.
-            if output=$(helm show chart oci://ghcr.io/"${GITHUB_REPOSITORY}"/"${name}" \
-                --version "${version}" 2>&1); then
-              echo "::notice::Skipping ${name} ${version}: already published to GHCR"
-              continue
-            elif grep -q "not found" <<< "${output}"; then
-              : # genuinely absent — fall through to push and sign
-            else
-              echo "::error::Cannot verify ${name} ${version} in GHCR; refusing to push blind"
-              echo "${output}"
-              exit 1
+            if [ -z "${pkg:-}" ]; then
+              break
             fi
-
             helm push "${pkg}" oci://ghcr.io/"${GITHUB_REPOSITORY}"
+            file=${pkg##*/}
+            name=${file%-*}
+            version=${file%.*}
+            version=${version##*-}
             cosign sign --yes ghcr.io/"${GITHUB_REPOSITORY}"/"${name}":"${version}"
           done
